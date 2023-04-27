@@ -31,7 +31,7 @@ const question = fs.readFileSync('src/question.txt', 'utf8');
   console.log();
 
   const chatGptResponse = await openai.createChatCompletion({
-    model: 'gpt-3.5-turbo',
+    model: 'gpt-4',
     temperature: 1,
     top_p: 0.5,
     messages: [
