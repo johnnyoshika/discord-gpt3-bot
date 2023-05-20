@@ -1,6 +1,11 @@
 import 'dotenv/config';
-import { Configuration, OpenAIApi } from 'openai';
+import {
+  ChatCompletionRequestMessage,
+  Configuration,
+  OpenAIApi,
+} from 'openai';
 import fs from 'fs';
+import { encoding_for_model } from '@dqbd/tiktoken';
 
 const openai = new OpenAIApi(
   new Configuration({
@@ -13,6 +18,11 @@ const question = fs.readFileSync('src/question.txt', 'utf8');
 
 (async () => {
   try {
+    let encoding = encoding_for_model('text-davinci-003');
+    let tokens = encoding.encode(question);
+    encoding.free();
+    console.log('expected prompt tokens', tokens.length);
+
     const gptResponse = await openai.createCompletion({
       model: 'text-davinci-003',
       prompt: question,
@@ -23,6 +33,11 @@ const question = fs.readFileSync('src/question.txt', 'utf8');
       frequency_penalty: 0.5,
     });
 
+    console.log(
+      'actual prompt tokens',
+      gptResponse.data.usage?.prompt_tokens,
+    );
+
     const text = gptResponse.data.choices[0].text;
 
     console.log(text);
@@ -31,23 +46,37 @@ const question = fs.readFileSync('src/question.txt', 'utf8');
     console.log('========================================');
     console.log();
 
+    const messages: ChatCompletionRequestMessage[] = [
+      {
+        role: 'system',
+        content: instruction,
+      },
+      {
+        role: 'user',
+        content: question,
+      },
+    ];
+
+    encoding = encoding_for_model('gpt-4');
+    tokens = encoding.encode(
+      messages.map(m => `${m.role}: ${m.content}`).join('\n'),
+    );
+    console.log('expected prompt tokens (map)', tokens.length); // This estimates low
+    tokens = encoding.encode(JSON.stringify(messages));
+    console.log('expected prompt tokens (JSON)', tokens.length); // This estimates high (conservative and safe)
+    encoding.free();
+
     const chatGptResponse = await openai.createChatCompletion({
       model: 'gpt-4',
       temperature: 1,
       top_p: 0.5,
-      messages: [
-        {
-          role: 'system',
-          content: instruction,
-        },
-        {
-          role: 'user',
-          content: question,
-        },
-      ],
+      messages,
     });
 
-    console.log('tokens', chatGptResponse.data.usage?.total_tokens);
+    console.log(
+      'actual prompt tokens',
+      chatGptResponse.data.usage?.prompt_tokens,
+    );
 
     console.log();
 
